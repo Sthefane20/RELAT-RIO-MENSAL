@@ -8,6 +8,10 @@ import os
 # Configuração da página
 st.set_page_config(page_title="Gestão de Entregas", layout="wide")
 
+# Inicializar estado de login se não existir
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+
 # ---------------- CSS ----------------
 def local_css(file_name):
     if os.path.exists(file_name):
@@ -29,6 +33,13 @@ def init_db():
     """)
     conn.close()
 
+def limpar_banco_mes(mes):
+    conn = sqlite3.connect("gestao_entregas.db")
+    conn.execute("DELETE FROM entregas WHERE mes_referencia = ?", (mes,))
+    conn.commit()
+    conn.close()
+    st.success(f"🚨 Todos os relatórios do mês {mes} foram apagados!")
+
 init_db()
 
 # ---------------- FUNÇÕES DE APOIO ----------------
@@ -48,10 +59,8 @@ def normalizar_status(valor):
 
 def salvar_no_banco(df, substituir=False):
     if substituir:
-        conn = sqlite3.connect("gestao_entregas.db")
-        conn.execute("DELETE FROM entregas")
-        conn.commit()
-        conn.close()
+        limpar_banco_mes(mes_selecionado)
+
 
     df.columns = [c.strip().upper() for c in df.columns]
     COL_DATA, COL_RESP, COL_TAREFA, COL_STATUS = "DATA DA ENTREGA", "RESPONSÁVEL ENTREGA", "OBRIGAÇÃO / TAREFA", "STATUS"
@@ -74,20 +83,32 @@ def salvar_no_banco(df, substituir=False):
     conn.close()
     st.success("✅ Importado com sucesso!")
 
-# Substituindo st.sidebar.title("Acesso") pela logo
+# ---------------- SIDEBAR / LOGIN ----------------
 if os.path.exists("logo.png"):
-    st.sidebar.image("logo.png", width='stretch')
+    st.sidebar.image("logo.png", use_container_width=True)
 
 perfil = st.sidebar.selectbox("Perfil", ["Visualização", "Administrador"])
 
-autenticado = True
+# Lógica de Login para Administrador
 if perfil == "Administrador":
-    senha = st.sidebar.text_input("Senha", type="password")
-    if senha != "admin123":
-        st.sidebar.warning("Aguardando senha...")
-        autenticado = False
+    if not st.session_state.autenticado:
+        senha = st.sidebar.text_input("Senha", type="password")
+        if st.sidebar.button("ENTRAR"):
+            if senha == "admin123":
+                st.session_state.autenticado = True
+                st.rerun()
+            else:
+                st.sidebar.error("Senha incorreta")
+    else:
+        if st.sidebar.button("Sair do Admin"):
+            st.session_state.autenticado = False
+            st.rerun()
+else:
+    # Se mudar para Visualização, desloga por segurança (opcional)
+    st.session_state.autenticado = False
 
 # ---------------- FORMULÁRIO DE FILTROS ----------------
+st.sidebar.divider()
 with st.sidebar.form("filtros"):
     st.markdown("### Filtros")
     conn = sqlite3.connect("gestao_entregas.db")
@@ -104,16 +125,29 @@ with st.sidebar.form("filtros"):
     
     btn_filtrar = st.form_submit_button("APLICAR FILTROS")
 
-# ---------------- ÁREA ADMIN ----------------
-if perfil == "Administrador" and autenticado:
+# ---------------- ÁREA ADMIN (Só aparece se autenticado) ----------------
+if perfil == "Administrador" and st.session_state.autenticado:
     st.markdown("---")
-    st.subheader("Painel Administrativo")
-    arquivo = st.file_uploader("Subir Planilha", type=["xlsx", "csv"])
-    sub = st.checkbox("Substituir tudo ao processar")
-    if st.button("Processar Upload") and arquivo:
-        df_up = pd.read_excel(arquivo) if arquivo.name.endswith("xlsx") else pd.read_csv(arquivo)
-        salvar_no_banco(df_up, sub)
-        st.rerun()
+    st.header("🛠 Painel Administrativo")
+    
+    col_adm1, col_adm2 = st.columns(2)
+    
+    with col_adm1:
+        st.subheader("📤 Upload de Dados")
+        arquivo = st.file_uploader("Subir Planilha", type=["xlsx", "csv"])
+        sub = st.checkbox("Substituir tudo ao processar")
+        if st.button("🚀 Processar Upload") and arquivo:
+            df_up = pd.read_excel(arquivo) if arquivo.name.endswith("xlsx") else pd.read_csv(arquivo)
+            salvar_no_banco(df_up, sub)
+            st.rerun()
+            
+    with col_adm2:
+        st.subheader("🗑 Gerenciar Relatórios")
+        st.markdown("Selecione o mês para apagar os dados:")
+        mes_selecionado = st.selectbox("Selecione o Mês", options=meses_opcoes)
+        if st.button(f"Apagar Dados de {mes_selecionado}"):
+            limpar_banco_mes(mes_selecionado)
+            st.rerun()
 
 # ---------------- LÓGICA DE CARREGAMENTO ----------------
 conn = sqlite3.connect("gestao_entregas.db")
@@ -131,10 +165,10 @@ if not df.empty:
     if sel_colabs: df = df[df["colaborador"].isin(sel_colabs)]
 
 # ---------------- DASHBOARD ----------------
-st.title("Relatório de Entregas")
+st.title("📊 Relatório de Entregas")
 
 if df.empty:
-    st.info("Nenhum dado disponível. Selecione os filtros ou realize um upload.")
+    st.info("Nenhum dado disponível. Faça login como Administrador e suba uma planilha.")
 else:
     # Cards de Métricas
     c1, c2, c3, c4 = st.columns(4)
@@ -144,39 +178,27 @@ else:
     c4.metric("Justificadas ⚠️", len(df[df["status"]=="Justificada"]))
 
     st.markdown("---")
-
+    # Gráficos
     col_graf1, col_graf2 = st.columns(2)
-
     with col_graf1:
         st.subheader("Performance Geral")
         status_counts = df["status"].value_counts().reset_index()
         status_counts.columns = ["status","count"]
-
-        fig_pie = px.pie(
-            status_counts,
-            names="status",
-            values="count",
-            hole=0.6,
-            color="status",
-            # Paleta Minimalista Preto/Cinza/Branco
-            color_discrete_map={"No prazo":"#4AF55A","Atrasada":"#F5362B","Justificada":"#F57C2C"}
-        )
+        fig_pie = px.pie(status_counts, names="status", values="count", hole=0.6,
+                         color="status", color_discrete_map={"No prazo":"#000000","Atrasada":"#E5E7EB","Justificada":"#6B7280"})
         fig_pie.update_traces(rotation=90, textinfo="percent")
-        fig_pie.update_layout(margin=dict(t=0,b=0,l=0,r=0), legend=dict(orientation="h", y=-0.1))
-        st.plotly_chart(fig_pie, width='stretch')
+        st.plotly_chart(fig_pie, use_container_width=True)
 
     with col_graf2:
         st.subheader("Top 10 Obrigações")
         top = df["tarefa"].value_counts().head(10).reset_index()
         top.columns = ["tarefa","count"]
-        fig_bar = px.bar(top, x="count", y="tarefa", orientation="h", color_discrete_sequence=["#2C76F5"])
-        fig_bar.update_layout(xaxis_title=None, yaxis_title=None, margin=dict(t=0,b=0,l=0,r=0))
-        st.plotly_chart(fig_bar, width='stretch')
+        fig_bar = px.bar(top, x="count", y="tarefa", orientation="h", color_discrete_sequence=["#000000"])
+        st.plotly_chart(fig_bar, use_container_width=True)
 
     st.subheader("Desempenho por Colaborador")
     resumo = df.groupby(["colaborador","status"]).size().unstack(fill_value=0)
     for s in ["No prazo","Atrasada","Justificada"]:
         if s not in resumo.columns: resumo[s] = 0
     resumo["Total"] = resumo.sum(axis=1)
-    
-    st.dataframe(resumo.sort_values("Total", ascending=False), width='stretch')
+    st.dataframe(resumo.sort_values("Total", ascending=False), use_container_width=True)
