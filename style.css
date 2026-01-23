@@ -1,128 +1,39 @@
-/* ===== VARIÁVEIS MONOCROMÁTICAS (BENTO STYLE) ===== */
 :root {
-    --bg-page: #F9FAFB;       /* Fundo cinza ultra claro */
-    --bg-card: #FFFFFF;       /* Fundo dos cards branco puro */
-    --text-main: #000000;     /* Preto para títulos e valores */
-    --text-sub: #6B7280;      /* Cinza para labels secundárias */
-    --border: #E5E7EB;        /* Bordas finas e sutis */
-    --radius: 16px;           /* Bordas arredondadas modernas */
+    --bg-page: #F9FAFB;
+    --radius: 12px;
 }
 
-/* ===== FUNDO DA PÁGINA ===== */
-.stApp {
-    background-color: var(--bg-page);
-}
+.stApp { background-color: var(--bg-page); }
 
-/* ===== TÍTULOS ===== */
-h1, h2, h3 {
-    color: var(--text-main) !important;
-    font-weight: 700 !important;
-    letter-spacing: -0.02em !important;
-}
-
-/* ===== SIDEBAR (Minimalista) ===== */
-[data-testid="stSidebar"] {
-    background-color: #FFFFFF !important;
-    border-right: 1px solid var(--border);
-}
-
-/* Formulário de Filtros dentro da Sidebar */
-[data-testid="stForm"] {
-    border: 1px solid var(--border) !important;
-    border-radius: var(--radius) !important;
-    padding: 1.5rem !important;
-    background-color: #FFFFFF !important;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
-}
-
-/* ===== MÉTRICAS (Bento Box) ===== */
+/* Bento Cards para Métricas */
 div[data-testid="stMetric"] {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    padding: 20px !important;
+    background: white;
+    border: 1px solid #E5E7EB;
+    padding: 15px !important;
     border-radius: var(--radius) !important;
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
 }
 
-div[data-testid="stMetric"] label {
-    color: var(--text-sub) !important;
-    font-size: 0.75rem !important;
-    font-weight: 600 !important;
-    text-transform: uppercase;
-}
-
-div[data-testid="stMetric"] [data-testid="stMetricValue"] {
-    color: var(--text-main) !important;
-    font-weight: 800 !important;
-    font-size: 2rem !important;
-}
-
-/* ===== COMPONENTES DE SELEÇÃO (Multiselect/Selectbox) ===== */
-div[data-baseweb="select"] {
-    border-radius: 8px !important;
-}
-
-/* Etiquetas (Tags) selecionadas em PRETO */
-div[data-baseweb="tag"] {
+/* Estilização focada apenas nos itens, não no container de popover */
+span[data-baseweb="tag"] {
     background-color: #000000 !important;
-    color: #FFFFFF !important;
     border-radius: 4px !important;
 }
 
-div[data-baseweb="tag"] span {
-    color: #FFFFFF !important;
-}
+span[data-baseweb="tag"] span { color: #FFFFFF !important; }
 
-/* ===== BOTÃO FILTRAR (Sólido Preto) ===== */
-button[kind="primaryFormSubmit"] {
-    background-color: #000000 !important;
-    color: #FFFFFF !important;
-    border: none !important;
-    border-radius: 10px !important;
-    font-weight: 600 !important;
-    height: 3rem !important;
-    width: 100% !important;
-    transition: transform 0.1s ease;
-}
-
-button[kind="primaryFormSubmit"]:hover {
-    background-color: #222222 !important;
-    color: #FFFFFF !important;
-}
-
-button[kind="primaryFormSubmit"]:active {
-    transform: scale(0.98);
-}
-
-/* ===== GRÁFICOS E TABELAS ===== */
-.stPlotlyChart {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1rem;
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-}
-
-.stDataFrame {
-    border: 1px solid var(--border);
-    border-radius: var(--radius) !important;
-}
-
-/* ===== ÁREA ADMINISTRATIVA ===== */
-.admin-box {
-    background: #F3F4F6;
-    padding: 24px;
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    margin-bottom: 2rem;
-}
-
-/* Correção para Dropdowns (Nomes sumindo) */
-div[data-baseweb="popover"] {
+/* Evita forçar background no popover genérico para não quebrar o motor do JS */
+ul[role="listbox"] {
     background-color: #FFFFFF !important;
     color: #000000 !important;
 }
 
-div[role="listbox"] div {
-    color: #000000 !important;
+li[role="option"]:hover {
+    background-color: #F3F4F6 !important;
+}
+
+button[kind="primaryFormSubmit"] {
+    background-color: #000000 !important;
+    color: white !important;
+    border-radius: 8px !important;
+    width: 100% !important;
 }
