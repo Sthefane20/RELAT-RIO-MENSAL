@@ -5,10 +5,10 @@ import plotly.express as px
 from datetime import datetime
 import os
 
-# Configuração da página
-st.set_page_config(page_title="Gestão de Entregas", layout="wide")
+# Configuracao da pagina
+st.set_page_config(page_title="Gestao de Entregas", layout="wide")
 
-# Inicializar estado de login se não existir
+# Inicializar estado de login
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
@@ -38,17 +38,15 @@ def limpar_banco_mes(mes):
     conn.execute("DELETE FROM entregas WHERE mes_referencia = ?", (mes,))
     conn.commit()
     conn.close()
-    st.success(f"🚨 Todos os relatórios do mês {mes} foram apagados!")
+    st.info(f"Dados do mes {mes} removidos com sucesso.")
 
 init_db()
 
-# ---------------- FUNÇÕES DE APOIO ----------------
+# ---------------- FUNCOES DE APOIO ----------------
 def classificar_departamento(tarefa):
-    dp = ["admissão","admissao","ferias","férias","folha complementar","recalculo dp","rescisão","rescisao"]
-    fiscal = ["fiscal","fiscal-contábil","fiscal-contabil","setor fiscal-regularização"]
+    dp = ["admissao", "ferias", "folha", "recalculo", "rescisao"]
     t = str(tarefa).lower().strip()
     if any(x in t for x in dp): return "Pessoal (DP)"
-    if any(x in t for x in fiscal): return "Fiscal"
     return "Fiscal"
 
 def normalizar_status(valor):
@@ -57,22 +55,20 @@ def normalizar_status(valor):
     if "JUST" in v: return "Justificada"
     return "No prazo"
 
-def salvar_no_banco(df, substituir=False):
-    if substituir:
-        limpar_banco_mes(mes_selecionado)
-
+def salvar_no_banco(df, substituir=False, mes_ref=None):
+    if substituir and mes_ref:
+        limpar_banco_mes(mes_ref)
 
     df.columns = [c.strip().upper() for c in df.columns]
-    COL_DATA, COL_RESP, COL_TAREFA, COL_STATUS = "DATA DA ENTREGA", "RESPONSÁVEL ENTREGA", "OBRIGAÇÃO / TAREFA", "STATUS"
+    COL_DATA, COL_RESP, COL_TAREFA, COL_STATUS = "DATA DA ENTREGA", "RESPONSAVEL ENTREGA", "OBRIGACAO / TAREFA", "STATUS"
     
     df[COL_DATA] = pd.to_datetime(df[COL_DATA], format="%d/%m/%Y", errors="coerce")
     df = df.dropna(subset=[COL_DATA])
-    df = df[df[COL_RESP].astype(str).str.strip() != "Tecnologia e Inovação - Contas Contabilidade"]
-
+    
     df_final = pd.DataFrame()
     df_final["data_entrega"] = df[COL_DATA].dt.strftime("%d/%m/%Y")
     df_final["mes_referencia"] = df[COL_DATA].dt.strftime("%Y-%m")
-    df_final["colaborador"] = df[COL_RESP].fillna("Não informado")
+    df_final["colaborador"] = df[COL_RESP].fillna("Nao informado")
     df_final["tarefa"] = df[COL_TAREFA].fillna("Sem tarefa")
     df_final["status"] = df[COL_STATUS].apply(normalizar_status)
     df_final["departamento"] = df_final["tarefa"].apply(classificar_departamento)
@@ -81,75 +77,47 @@ def salvar_no_banco(df, substituir=False):
     conn = sqlite3.connect("gestao_entregas.db")
     df_final.to_sql("entregas", conn, if_exists="append", index=False)
     conn.close()
-    st.success("✅ Importado com sucesso!")
+    st.success("Dados importados com sucesso.")
 
-# ---------------- SIDEBAR / LOGIN ----------------
+# ---------------- SIDEBAR ----------------
 if os.path.exists("logo.png"):
     st.sidebar.image("logo.png", use_container_width=True)
 
-perfil = st.sidebar.selectbox("Perfil", ["Visualização", "Administrador"])
+perfil = st.sidebar.selectbox("Perfil de Acesso", ["Visualizacao", "Administrador"])
 
-# Lógica de Login para Administrador
 if perfil == "Administrador":
     if not st.session_state.autenticado:
         senha = st.sidebar.text_input("Senha", type="password")
-        if st.sidebar.button("ENTRAR"):
+        if st.sidebar.button("Entrar"):
             if senha == "admin123":
                 st.session_state.autenticado = True
                 st.rerun()
             else:
                 st.sidebar.error("Senha incorreta")
     else:
-        if st.sidebar.button("Sair do Admin"):
+        if st.sidebar.button("Sair do Modo Admin"):
             st.session_state.autenticado = False
             st.rerun()
-else:
-    # Se mudar para Visualização, desloga por segurança (opcional)
-    st.session_state.autenticado = False
 
-# ---------------- FORMULÁRIO DE FILTROS ----------------
 st.sidebar.divider()
+
+# Carregar opcoes para os filtros
+conn = sqlite3.connect("gestao_entregas.db")
+try:
+    meses_opcoes = pd.read_sql("SELECT DISTINCT mes_referencia FROM entregas ORDER BY mes_referencia DESC", conn)["mes_referencia"].tolist()
+    colabs_opcoes = pd.read_sql("SELECT DISTINCT colaborador FROM entregas ORDER BY colaborador ASC", conn)["colaborador"].tolist()
+except:
+    meses_opcoes, colabs_opcoes = [], []
+conn.close()
+
 with st.sidebar.form("filtros"):
-    st.markdown("### Filtros")
-    conn = sqlite3.connect("gestao_entregas.db")
-    try:
-        meses_opcoes = pd.read_sql("SELECT DISTINCT mes_referencia FROM entregas ORDER BY mes_referencia DESC", conn)["mes_referencia"].tolist()
-        colabs_opcoes = pd.read_sql("SELECT DISTINCT colaborador FROM entregas ORDER BY colaborador ASC", conn)["colaborador"].tolist()
-    except:
-        meses_opcoes, colabs_opcoes = [], []
-    conn.close()
-
-    sel_meses = st.multiselect("Meses", options=meses_opcoes, placeholder="Todos (Geral)")
+    st.markdown("**Filtros de Pesquisa**")
+    sel_meses = st.multiselect("Meses", options=meses_opcoes)
     sel_deps = st.multiselect("Departamentos", options=["Fiscal", "Pessoal (DP)"], default=["Fiscal", "Pessoal (DP)"])
-    sel_colabs = st.multiselect("Colaboradores", options=colabs_opcoes, placeholder="Todos")
-    
-    btn_filtrar = st.form_submit_button("APLICAR FILTROS")
+    sel_colabs = st.multiselect("Colaboradores", options=colabs_opcoes)
+    btn_filtrar = st.form_submit_button("Aplicar Filtros")
 
-# ---------------- ÁREA ADMIN (Só aparece se autenticado) ----------------
-if perfil == "Administrador" and st.session_state.autenticado:
-    st.markdown("---")
-    st.header("🛠 Painel Administrativo")
-    
-    col_adm1, col_adm2 = st.columns(2)
-    
-    with col_adm1:
-        st.subheader("📤 Upload de Dados")
-        arquivo = st.file_uploader("Subir Planilha", type=["xlsx", "csv"])
-        sub = st.checkbox("Substituir tudo ao processar")
-        if st.button("🚀 Processar Upload") and arquivo:
-            df_up = pd.read_excel(arquivo) if arquivo.name.endswith("xlsx") else pd.read_csv(arquivo)
-            salvar_no_banco(df_up, sub)
-            st.rerun()
-            
-    with col_adm2:
-        st.subheader("🗑 Gerenciar Relatórios")
-        st.markdown("Selecione o mês para apagar os dados:")
-        mes_selecionado = st.selectbox("Selecione o Mês", options=meses_opcoes)
-        if st.button(f"Apagar Dados de {mes_selecionado}"):
-            limpar_banco_mes(mes_selecionado)
-            st.rerun()
-
-# ---------------- LÓGICA DE CARREGAMENTO ----------------
+# ---------------- LOGICA DE DADOS ----------------
 conn = sqlite3.connect("gestao_entregas.db")
 if not sel_meses:
     query = "SELECT * FROM entregas"
@@ -164,41 +132,71 @@ if not df.empty:
     if sel_deps: df = df[df["departamento"].isin(sel_deps)]
     if sel_colabs: df = df[df["colaborador"].isin(sel_colabs)]
 
-# ---------------- DASHBOARD ----------------
-st.title("📊 Relatório de Entregas")
+# ---------------- CONTEUDO PRINCIPAL ----------------
+st.title("Entregas Mensais - Acessórias")
+st.markdown("Esse gráficos correspondem as entregas mensais de obrigações do sistema Acessórias realizadas pelos colaboradores. Considerando o primeiro e último dia de cada mês.")
+
+if perfil == "Administrador" and st.session_state.autenticado:
+    with st.expander("Painel de Controle Administrativo", expanded=False):
+        col_adm1, col_adm2 = st.columns(2)
+        with col_adm1:
+            st.markdown("**Upload de Novos Dados**")
+            arquivo = st.file_uploader("Carregar planilha", type=["xlsx", "csv"])
+            sub = st.checkbox("Substituir dados existentes")
+            if st.button("Processar Arquivo") and arquivo:
+                df_up = pd.read_excel(arquivo) if arquivo.name.endswith("xlsx") else pd.read_csv(arquivo)
+                salvar_no_banco(df_up, sub, mes_ref=None)
+                st.rerun()
+        
+        with col_adm2:
+            st.markdown("**Gerenciar Periodos**")
+            mes_del = st.selectbox("Selecionar mes para exclusao", options=meses_opcoes, key="del_mes")
+            if st.button("Remover Registros"):
+                limpar_banco_mes(mes_del)
+                st.rerun()
+
+st.divider()
 
 if df.empty:
-    st.info("Nenhum dado disponível. Faça login como Administrador e suba uma planilha.")
+    st.info("Nao ha dados para exibir com os filtros selecionados.")
 else:
-    # Cards de Métricas
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total de Tarefas", len(df))
-    c2.metric("No Prazo ✅", len(df[df["status"]=="No prazo"]))
-    c3.metric("Atrasadas 🚨", len(df[df["status"]=="Atrasada"]))
-    c4.metric("Justificadas ⚠️", len(df[df["status"]=="Justificada"]))
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Total de Tarefas", len(df))
+    m2.metric("No Prazo", len(df[df["status"]=="No prazo"]))
+    m3.metric("Atrasadas", len(df[df["status"]=="Atrasada"]))
+    m4.metric("Justificadas", len(df[df["status"]=="Justificada"]))
 
-    st.markdown("---")
-    # Gráficos
-    col_graf1, col_graf2 = st.columns(2)
-    with col_graf1:
-        st.subheader("Performance Geral")
+    col_g1, col_g2 = st.columns([1, 1.2])
+    
+    with col_g1:
+        st.markdown("### Dados Gerais")
         status_counts = df["status"].value_counts().reset_index()
-        status_counts.columns = ["status","count"]
-        fig_pie = px.pie(status_counts, names="status", values="count", hole=0.6,
-                         color="status", color_discrete_map={"No prazo":"#000000","Atrasada":"#E5E7EB","Justificada":"#6B7280"})
-        fig_pie.update_traces(rotation=90, textinfo="percent")
+        status_counts.columns = ["status","total"]
+        fig_pie = px.pie(status_counts, names="status", values="total", hole=0.6,
+                         color="status",
+                         color_discrete_map={"No prazo":"#10B981","Atrasada":"#EF4444","Justificada":"#F59E0B"})
+        fig_pie.update_layout(margin=dict(t=0, b=0, l=0, r=0), legend=dict(orientation="h", y=-0.1))
         st.plotly_chart(fig_pie, use_container_width=True)
 
-    with col_graf2:
-        st.subheader("Top 10 Obrigações")
+    with col_g2:
+        st.markdown("### Top 10 Obrigacões")
         top = df["tarefa"].value_counts().head(10).reset_index()
-        top.columns = ["tarefa","count"]
-        fig_bar = px.bar(top, x="count", y="tarefa", orientation="h", color_discrete_sequence=["#000000"])
+        top.columns = ["tarefa","total"]
+        fig_bar = px.bar(top, x="total", y="tarefa", orientation="h",
+                         color_discrete_sequence=["#0C50BD"])
+        fig_bar.update_layout(margin=dict(t=0, b=0, l=0, r=0), yaxis={'categoryorder':'total ascending'})
         st.plotly_chart(fig_bar, use_container_width=True)
 
-    st.subheader("Desempenho por Colaborador")
+    st.markdown("### Desempenho por Colaborador")
     resumo = df.groupby(["colaborador","status"]).size().unstack(fill_value=0)
-    for s in ["No prazo","Atrasada","Justificada"]:
-        if s not in resumo.columns: resumo[s] = 0
+    
+    for s in ["No prazo", "Atrasada", "Justificada"]:
+        if s not in resumo.columns: 
+            resumo[s] = 0
+    
     resumo["Total"] = resumo.sum(axis=1)
-    st.dataframe(resumo.sort_values("Total", ascending=False), use_container_width=True)
+    
+    st.dataframe(
+        resumo.sort_values("Total", ascending=False), 
+        use_container_width=True
+    )
