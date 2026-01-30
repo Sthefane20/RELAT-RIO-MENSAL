@@ -1,39 +1,77 @@
 :root {
+
     --bg-page: #F9FAFB;
+
     --radius: 12px;
+
 }
 
-.stApp { background-color: var(--bg-page); }
+
+
+.stApp { background-color: #F3F3F3 !important}
+
+
 
 /* Bento Cards para Métricas */
+
 div[data-testid="stMetric"] {
+
     background: white;
+
     border: 1px solid #E5E7EB;
+
     padding: 15px !important;
+
     border-radius: var(--radius) !important;
+
 }
 
+
+
 /* Estilização focada apenas nos itens, não no container de popover */
+
 span[data-baseweb="tag"] {
+
     background-color: #000000 !important;
+
     border-radius: 4px !important;
+
 }
+
+
 
 span[data-baseweb="tag"] span { color: #FFFFFF !important; }
 
+
+
 /* Evita forçar background no popover genérico para não quebrar o motor do JS */
+
 ul[role="listbox"] {
+
     background-color: #FFFFFF !important;
+
     color: #000000 !important;
+
 }
+
+
 
 li[role="option"]:hover {
+
     background-color: #F3F4F6 !important;
+
 }
 
+
+
 button[kind="primaryFormSubmit"] {
+
     background-color: #000000 !important;
+
     color: white !important;
+
     border-radius: 8px !important;
+
     width: 100% !important;
+
 }
